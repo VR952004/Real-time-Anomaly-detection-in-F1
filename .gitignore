@@ -1,0 +1,16 @@
+# Virtual Environments
+venv/
+env/
+.env
+
+# Python Cache (These generate automatically when you run scripts)
+__pycache__/
+*.py[cod]
+*$py.class
+
+# VS Code / Codespaces settings
+.vscode/
+
+# Data Files (Crucial for later, so you don't upload massive F1 CSVs)
+*.csv
+*.parquet
