@@ -14,14 +14,13 @@ session.load()
 # Fetching telemetry
 print("Extracting Max Verstappen's telemetry...")
 laps = session.laps.pick_driver('VER')
-fastest_lap = laps.pick_fastest()
-telemetry = fastest_lap.get_telemetry()
+telemetry = laps.get_telemetry()
 
 print("Starting live stream simulation...")
 print("-" * 40)
 
 # Connect to the Kafka server we just started in Docker
-conf = {'bootstrap.servers': 'localhost:9092'}
+conf = {'bootstrap.servers': '127.0.0.1:9092'}
 producer = Producer(conf)
 topic_name = 'f1-telemetry'
 

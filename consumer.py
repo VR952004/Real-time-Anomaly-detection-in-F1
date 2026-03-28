@@ -15,7 +15,7 @@ write_api = db_client.write_api(write_options=SYNCHRONOUS)
 
 # 2. Connect to Kafka
 conf = {
-    'bootstrap.servers': 'localhost:9092',
+    'bootstrap.servers': '127.0.0.1:9092',
     'group.id': 'f1-telemetry-group',
     'auto.offset.reset': 'earliest'
 }
