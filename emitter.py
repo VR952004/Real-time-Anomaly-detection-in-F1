@@ -1,50 +1,79 @@
 import fastf1
-import time
+import pandas as pd
 import json
+import time
 from confluent_kafka import Producer
 
-# Setup the cache so we don't redownload gigabytes of data every run
-fastf1.Cache.enable_cache('cache')
+# 1. Setup Kafka Producer
+conf = {'bootstrap.servers': '127.0.0.1:9092'}
+producer = Producer(conf)
 
-print("Downloading session data... this might take a minute on the first run.")
-# Loading a session
-session = fastf1.get_session(2026, 'Shanghai', 'R')
+def delivery_report(err, msg):
+    if err is not None:
+        print(f"Message delivery failed: {err}")
+
+# 2. Load the Session
+fastf1.Cache.enable_cache('cache')
+print("Loading Session Data...")
+session = fastf1.get_session(2026, 'Shanghai', 'Race')
 session.load()
 
-# Fetching telemetry
-print("Extracting Max Verstappen's telemetry...")
 laps = session.laps.pick_driver('VER')
 telemetry = laps.get_telemetry()
 
-print("Starting live stream simulation...")
-print("-" * 40)
+track_status = session.track_status
 
-# Connect to the Kafka server we just started in Docker
-conf = {'bootstrap.servers': '127.0.0.1:9092'}
-producer = Producer(conf)
-topic_name = 'f1-telemetry'
+track_status = track_status.rename(columns={'Time': 'SessionTime'})
 
-#The Streaming Loop
+telemetry = pd.merge_asof(
+    telemetry.sort_values('SessionTime'),
+    track_status.sort_values('SessionTime'),
+    on='SessionTime',
+    direction='backward'
+)
+
+if 'Status' not in telemetry.columns:
+    telemetry = pd.merge_asof(
+        telemetry.sort_values('SessionTime'),
+        track_status[['SessionTime', 'Status']].sort_values('SessionTime'),
+        on='SessionTime',
+        direction='backward'
+    )
+
+print("Starting full Grand Prix live stream simulation...")
+print("-" * 50)
+
+# 4. The Live Stream Loop
 for index, row in telemetry.iterrows():
     
-    # Package the specific data points we care about into a dictionary
+    # We now dynamically pull the exact track status for this specific millisecond
     payload = {
-        "timestamp": str(row['Date']),
-        "driver": "VER",
-        "speed_kmh": int(row['Speed']),
-        "rpm": int(row['RPM']),
-        "gear": int(row['nGear']),
-        "throttle": int(row['Throttle']),
-        "brake": bool(row['Brake'])
+        'driver': 'VER',
+        'speed_kmh': row['Speed'],
+        'rpm': row['RPM'],
+        'gear': row['nGear'],
+        'throttle': row['Throttle'],
+        'brake': int(row['Brake']), 
+        'status': int(row['Status'])
     }
     
-    # Converting to JSON (the standard format for Kafka and streaming systems)
-    json_payload = json.dumps(payload)
+
+    producer.produce(
+        'f1-telemetry', 
+        key='VER', 
+        value=json.dumps(payload), 
+        callback=delivery_report
+    )
     
-    # Send the payload to the Kafka topic
-    producer.produce(topic_name, value=json_payload.encode('utf-8'))
-    producer.poll(0) # This cleans up the internal queue
-    print(f"Sent to Kafka: {json_payload}")
+    producer.poll(0)
     
-    # Pause for 100 milliseconds to simulate a live stream of data
+    # Terminal Logging (Only print every 10th row to keep terminal readable)
+    if index % 10 == 0:
+        flag_type = "GREEN" if payload['status'] == 1 else "SC/YELLOW"
+        print(f"Streaming -> Speed: {payload['speed_kmh']} km/h | Status: {flag_type}")
+    
+    # Simulate a real-time data feed (10 updates per second)
     time.sleep(0.1)
+
+producer.flush()
+print("Simulation Complete.")
