@@ -57,7 +57,6 @@ for index, row in telemetry.iterrows():
         'status': int(row['Status'])
     }
     
-
     producer.produce(
         'f1-telemetry', 
         key='VER', 
@@ -73,7 +72,7 @@ for index, row in telemetry.iterrows():
         print(f"Streaming -> Speed: {payload['speed_kmh']} km/h | Status: {flag_type}")
     
     # Simulate a real-time data feed (10 updates per second)
-    time.sleep(0.1)
+    time.sleep(0.01)
 
 producer.flush()
 print("Simulation Complete.")

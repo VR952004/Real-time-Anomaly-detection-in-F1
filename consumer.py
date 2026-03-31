@@ -1,30 +1,42 @@
 import json
+import joblib
+import warnings
+import uuid
 from confluent_kafka import Consumer
 from influxdb_client import InfluxDBClient, Point
 from influxdb_client.client.write_api import SYNCHRONOUS
 
-# 1. Connect to InfluxDB (Using the credentials from docker-compose)
-token = "my-super-secret-auth-token"
+# 1. Load the Model
+try:
+    model = joblib.load('f1_anomaly_model.pkl')
+    print("AI Model loaded.")
+except FileNotFoundError:
+    print("ERROR: f1_anomaly_model.pkl not found!")
+    exit()
+
+warnings.filterwarnings("ignore", category=UserWarning)
+
+# 2. Connect to InfluxDB (Synchronous / One-by-One)
+token = "my-super-secret-auth-token" 
 org = "f1-project"
 url = "http://localhost:8086"
 bucket = "telemetry"
-
-print("Connecting to InfluxDB...")
 db_client = InfluxDBClient(url=url, token=token, org=org)
-write_api = db_client.write_api(write_options=SYNCHRONOUS)
+write_api = db_client.write_api(write_options=SYNCHRONOUS) 
 
-# 2. Connect to Kafka
+# 3. Connect to Kafka (Randomized ID to prevent offset getting stuck)
 conf = {
     'bootstrap.servers': '127.0.0.1:9092',
-    'group.id': 'f1-telemetry-group',
-    'auto.offset.reset': 'earliest'
+    'group.id': f"f1-basic-{uuid.uuid4()}",
+    'auto.offset.reset': 'latest'
 }
 consumer = Consumer(conf)
 consumer.subscribe(['f1-telemetry'])
 
-print("Listening to Kafka and routing data to InfluxDB...")
+print("Running. Waiting for Emitter...")
 print("-" * 50)
 
+# 4. The Loop
 try:
     while True:
         msg = consumer.poll(1.0)
@@ -32,28 +44,36 @@ try:
         if msg is None or msg.error():
             continue
             
-        payload = json.loads(msg.value().decode('utf-8'))
+        try:
+            payload = json.loads(msg.value().decode('utf-8'))
+        except:
+            continue
+            
+        if 'status' not in payload:
+            continue
+            
+        # --- ML Inference ---
+        features = [[
+            payload['speed_kmh'], payload['rpm'], payload['gear'], 
+            payload['throttle'], payload['brake'], payload['status']
+        ]]
         
-        # The Anomaly Rule
-        is_anomaly = payload['gear'] == 8 and payload['speed_kmh'] < 100
+        prediction = model.predict(features)
+        is_anomaly = 1 if prediction[0] == -1 else 0
         
-        # 3. Package the data for the Time-Series Database
+        # --- Save to DB ---
         point = (
             Point("car_telemetry")
             .tag("driver", payload.get('driver', 'VER'))
             .field("speed", payload['speed_kmh'])
             .field("rpm", payload['rpm'])
             .field("gear", payload['gear'])
-            .field("is_anomaly", int(is_anomaly)) # Save as 1 (True) or 0 (False)
+            .field("throttle", payload['throttle'])
+            .field("status", payload['status'])
+            .field("is_anomaly", is_anomaly)
         )
         
-        # 4. Write to the database
         write_api.write(bucket=bucket, org=org, record=point)
-        
-        if is_anomaly:
-            print(f"ANOMALY SAVED TO DB -> Speed: {payload['speed_kmh']} in Gear {payload['gear']}")
-        else:
-            print(f"Saved to DB -> Speed: {payload['speed_kmh']} km/h")
 
 except KeyboardInterrupt:
     print("\nShutting down cleanly...")
