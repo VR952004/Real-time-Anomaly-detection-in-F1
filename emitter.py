@@ -54,7 +54,7 @@ if 'Status' not in telemetry.columns:
 # TIME TRAVEL : Skip to the end of the race
 # Uncomment the line below to fast-forward
 # ==========================================
-#telemetry = telemetry[telemetry['LapNumber'] >= 40]
+telemetry = telemetry[telemetry['LapNumber'] >= 40]
 
 print("Starting full Grand Prix live stream simulation...")
 print("-" * 50)

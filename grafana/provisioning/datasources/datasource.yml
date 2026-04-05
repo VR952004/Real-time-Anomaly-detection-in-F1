@@ -1,0 +1,16 @@
+apiVersion: 1
+
+datasources:
+  - name: influxdb
+    type: influxdb
+    uid: DS_INFLUXDB      # <--- This specifically targets the JSON file
+    access: proxy
+    url: http://influxdb:8086
+    jsonData:
+      version: Flux
+      organization: f1-project   # <--- Fixed to match your docker-compose
+      defaultBucket: telemetry
+      tlsSkipVerify: true
+    secureJsonData:
+      token: my-super-secret-auth-token # <--- Fixed to match your docker-compose
+    editable: true
