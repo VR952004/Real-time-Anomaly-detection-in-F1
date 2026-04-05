@@ -69,8 +69,10 @@ try:
             .field("rpm", payload['rpm'])
             .field("gear", payload['gear'])
             .field("throttle", payload['throttle'])
+            .field("brake", payload['brake'])
             .field("status", payload['status'])
             .field("is_anomaly", is_anomaly)
+            .field("lap", payload['lap'])
         )
         
         write_api.write(bucket=bucket, org=org, record=point)

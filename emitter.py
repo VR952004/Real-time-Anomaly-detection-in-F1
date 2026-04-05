@@ -32,6 +32,16 @@ telemetry = pd.merge_asof(
     direction='backward'
 )
 
+laps_for_merge = laps[['LapStartTime', 'LapNumber']].dropna().rename(columns={'LapStartTime': 'SessionTime'})
+telemetry = pd.merge_asof(
+    telemetry.sort_values('SessionTime'),
+    laps_for_merge.sort_values('SessionTime'),
+    on='SessionTime',
+    direction='backward'
+)
+
+telemetry['LapNumber'] = telemetry['LapNumber'].fillna(1)
+
 if 'Status' not in telemetry.columns:
     telemetry = pd.merge_asof(
         telemetry.sort_values('SessionTime'),
@@ -39,6 +49,12 @@ if 'Status' not in telemetry.columns:
         on='SessionTime',
         direction='backward'
     )
+
+# ==========================================
+# TIME TRAVEL : Skip to the end of the race
+# Uncomment the line below to fast-forward
+# ==========================================
+#telemetry = telemetry[telemetry['LapNumber'] >= 40]
 
 print("Starting full Grand Prix live stream simulation...")
 print("-" * 50)
@@ -54,7 +70,8 @@ for index, row in telemetry.iterrows():
         'gear': row['nGear'],
         'throttle': row['Throttle'],
         'brake': int(row['Brake']), 
-        'status': int(row['Status'])
+        'status': int(row['Status']),
+        'lap': int(row['LapNumber'])
     }
     
     producer.produce(
