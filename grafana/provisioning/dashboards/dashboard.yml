@@ -1,0 +1,14 @@
+apiVersion: 1
+
+providers:
+  - name: 'F1 Anomaly Detection' # The name visible in Grafana's dashboard settings
+    orgId: 1
+    folder: 'F1 Projects'        # This will put your dashboard in a folder named 'F1 Projects'
+    type: file
+    disableDeletion: false
+    editable: true               # Allows you to keep making tweaks even after provisioning
+    updateIntervalSeconds: 10    # Checks for changes to the JSON file every 10 seconds
+    options:
+      # This MUST match the internal path used in your docker-compose.yml
+      path: /etc/grafana/provisioning/dashboards
+      allowUiUpdates: true

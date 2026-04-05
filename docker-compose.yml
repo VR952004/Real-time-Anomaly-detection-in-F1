@@ -36,6 +36,9 @@ services:
     image: grafana/grafana:latest
     ports:
       - "3000:3000"
+    volumes:
+      # Maps your local 'dashboards' folder to the path in the .yml above
+      - ./grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards
     depends_on:
       - influxdb
     environment:
